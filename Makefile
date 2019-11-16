@@ -1,5 +1,6 @@
 CC = gcc
-CFLAGS = -g -O0 -Wall -Wextra -Werror -std=c99 -fopenmp
+# CFLAGS = -g -O0 -Wall -Wextra -Werror -std=c99 -fopenmp
+CCFLAGS = -g
 LIBS = -lm
 
 all: sequential clean
