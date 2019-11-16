@@ -167,10 +167,28 @@ int ** hashDataset(int nSets, int setSize, int **sets, int stages, int buckets) 
   return hashes;
 }
 
+void printElementsPerBucket(int **hashes, int nSets, int stages, int buckets) {
+  int i, j;
+  int **counts = allocateMatrix(stages, buckets);
+
+  printf("\n\n=== Last stage position ===\n");
+  for(i = 0; i < nSets; i++) {
+    for(j = 0; j < stages; j++) {
+      counts[j][hashes[i][j]]++;
+      if(j == stages - 1) {
+        printf("Set %d is on %d bucket\n", i, hashes[i][j]);
+      }
+    }
+  }
+
+  printf("\n\n=== Buckets on each stage ===\n");
+  printMatrix(stages, buckets, counts);
+}
+
 int main () {
   // Dataset params ///
   int nSets = 10;
-  int setSize = 100;
+  int setSize = 10;
   
   // Generating dataset // 
   int **sets = allocateMatrix(nSets, setSize);
@@ -186,6 +204,8 @@ int main () {
 
   // Generating hashes //
   int **hashes = hashDataset(nSets, setSize, sets, stages, buckets);
+
+  printElementsPerBucket(hashes, nSets, stages, buckets);
 
 	return 0;
 }
