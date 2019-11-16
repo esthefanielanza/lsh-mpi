@@ -3,6 +3,7 @@
 #include <string.h>
 #include <time.h>
 #include <math.h>
+#include <limits.h>
 
 double RANDOM_ACCURACY = 0.7;
 double THRESHOLD = 0.5;
@@ -81,8 +82,45 @@ int getSignatureSize(stages, setSize) {
   return r * stages;
 }
 
+
+int h(int hashPosition, int setValue, int **coefs) {
+  return (int)((coefs[hashPosition][0] * (long) setValue + coefs[hashPosition][1]) % LARGE_PRIME);
+}
+
+int * calculateSignature(int setSize, int signatureSize, int *set, int ** coefs) {
+  int i, j;
+  int *signature = allocateVector(signatureSize);
+
+  for(i = 0; i < signatureSize; i++) {
+    signature[i] = INT_MAX;
+  }
+
+  for(i = 0; i < setSize; i++) {
+    for(j = 0; j < signatureSize; j++) {
+      signature[j] = min(signature[j], h(j, set[i], coefs));
+    }
+  }
+
+  return signature;
+}
+
+// Converts to an array where we count the 1's positions //
+int * convertToSet(int *array, int length) {
+  int i, j = 0;
+  int *set = allocateVector(length);
+
+  for(i = 0; i < length; i++) {
+    if(array[i] == 1) {
+      set[j] = i;
+      j++;
+    }
+  }
+
+  return set;
+}
+
 void hashDataset(int **hashes, int nSets, int setSize, int **sets, int stages, int buckets) {
-  int i;
+  int i, j, k;
   int signatureSize = getSignatureSize(stages, setSize);
 
   printf("Signature size %d\n", signatureSize);
@@ -90,12 +128,26 @@ void hashDataset(int **hashes, int nSets, int setSize, int **sets, int stages, i
   // Compute hash function coefficients // 
   int **coefs = allocateMatrix(nSets, 2);
 
-  for(i = 0; i < setSize; i++) {
-    coefs[i][0] = rand() + 1;
-    coefs[i][1] = rand() + 1;
+  for(i = 0; i < signatureSize; i++) {
+    coefs[i][0] = (rand() % LARGE_PRIME) + 1;
+    coefs[i][1] = (rand() % LARGE_PRIME) + 1;
   }
 
-  printMatrix(nSets, 2, coefs);
+  printf("\n\n=== Computing coefficients ===\n");
+  printMatrix(signatureSize, 2, coefs);
+
+  printf("\n\n=== Calculating Hash ===\n");
+  int **counts = allocateMatrix(stages, buckets);
+
+  for(i = 0; i < nSets; i++) {
+    int *set = convertToSet(sets[i], setSize);
+    int *signature = calculateSignature(setSize, signatureSize, set, coefs);
+
+    // printf("Hash[%d]:", i);
+    // printVector(setSize, set);
+    // printf(" : ");
+    printVector(signatureSize, signature);
+  }
 }
 
 
@@ -103,14 +155,15 @@ void hashDataset(int **hashes, int nSets, int setSize, int **sets, int stages, i
 int main () {
   // Dataset params ///
   int nSets = 10;
-  int setSize = 10;
+  int setSize = 100;
   
   // Generating dataset // 
   int **sets = allocateMatrix(nSets, setSize);
 
   generateRandomSets(nSets, setSize, sets);
 
-  // printMatrix(nSets, setSize, sets);
+  printf("=== Sets ===\n");
+  printMatrix(nSets, setSize, sets);
   
   // LSH Params //
   int stages = 2;
