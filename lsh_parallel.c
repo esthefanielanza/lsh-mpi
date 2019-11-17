@@ -4,6 +4,7 @@
 #include <time.h>
 #include <math.h>
 #include <limits.h>
+#include <mpi.h>
 
 double RANDOM_ACCURACY = 0.7;
 double THRESHOLD = 0.5;
@@ -136,7 +137,7 @@ int ** hashDataset(int nSets, int setSize, int **sets, int stages, int buckets) 
   int i;
   int signatureSize = getSignatureSize(stages);
 
-  printf("Signature size %d\n", signatureSize);
+  // printf("Signature size %d\n", signatureSize);
 
   // Compute hash function coefficients // 
   int **coefs = allocateMatrix(nSets, 2);
@@ -150,10 +151,10 @@ int ** hashDataset(int nSets, int setSize, int **sets, int stages, int buckets) 
   int *set = allocateVector(setSize);
   int *signature = allocateVector(signatureSize);
 
-  printf("\n\n=== Computing coefficients ===\n");
-  printMatrix(signatureSize, 2, coefs);
+  // printf("\n\n=== Computing coefficients ===\n");
+  // printMatrix(signatureSize, 2, coefs);
 
-  printf("\n\n=== Calculating Hash ===\n");
+  // printf("\n\n=== Calculating Hash ===\n");
 
   for(i = 0; i < nSets; i++) {
     convertToSet(set, sets[i], setSize);
@@ -162,7 +163,7 @@ int ** hashDataset(int nSets, int setSize, int **sets, int stages, int buckets) 
     hashSignature(hashes[i], signature, stages, signatureSize, buckets);
     // printf("Hash[%d]:", i);
     // printf(" : ");
-    printVector(stages, hashes[i]);
+    // printVector(stages, hashes[i]);
   }
 
   free(set);
@@ -176,23 +177,27 @@ void printElementsPerBucket(int **hashes, int nSets, int stages, int buckets) {
   int i, j;
   int **counts = allocateMatrix(stages, buckets);
 
-  printf("\n\n=== Last stage position ===\n");
+  // printf("\n\n=== Last stage position ===\n");
   for(i = 0; i < nSets; i++) {
     for(j = 0; j < stages; j++) {
       counts[j][hashes[i][j]]++;
-      if(j == stages - 1) {
-        printf("Set %d is on %d bucket\n", i, hashes[i][j]);
-      }
+      // if(j == stages - 1) {
+      //   printf("Set %d is on %d bucket\n", i, hashes[i][j]);
+      // }
     }
   }
 
-  printf("\n\n=== Buckets on each stage ===\n");
-  printMatrix(stages, buckets, counts);
+  // printf("\n\n=== Buckets on each stage ===\n");
+  // printMatrix(stages, buckets, counts);
 
   deallocateMatrix(stages, counts);
 }
 
 int main () {
+  // Parallel variables //
+  int nProcess, myRank;
+  double start, end;
+
   // Dataset params ///
   int nSets = 10;
   int setSize = 10;
@@ -202,19 +207,35 @@ int main () {
 
   generateRandomSets(nSets, setSize, sets);
 
-  printf("=== Sets ===\n");
-  printMatrix(nSets, setSize, sets);
+  // printf("=== Sets ===\n");
+  // printMatrix(nSets, setSize, sets);
   
   // LSH Params //
   int stages = 2;
   int buckets = 4;
+
+  // Initialize the MPI enviroment //
+  MPI_Init(NULL, NULL);
+  MPI_Comm_size(MPI_COMM_WORLD, &nProcess);
+  MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
+
+  // Getting start time //
+  if(myRank == 0) {
+    start = MPI_Wtime();
+  }
 
   // Generating hashes //
   int **hashes = hashDataset(nSets, setSize, sets, stages, buckets);
 
   printElementsPerBucket(hashes, nSets, stages, buckets);
 
-  deallocateMatrix(nSets, sets);
   deallocateMatrix(nSets, hashes);
+
+  if(myRank == 0) {
+    end = MPI_Wtime();
+    printf("%.6lf\n", (end - start)*1000.0);
+  }
+
+  deallocateMatrix(nSets, sets);
 	return 0;
 }

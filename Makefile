@@ -1,9 +1,9 @@
-CC = gcc
+CC = mpicc
 # CFLAGS = -g -O0 -Wall -Wextra -Werror -std=c99 -fopenmp
 CCFLAGS = -g
 LIBS = -lm
 
-all: sequential clean
+all: sequential parallel clean
 
 sequential: sequential.o
 	$(CC) $(CFLAGS) lsh_sequential.o -o lsh_sequential $(LIBS)
@@ -11,17 +11,11 @@ sequential: sequential.o
 sequential.o: lsh_sequential.c
 	$(CC) $(CFLAGS) -c lsh_sequential.c
 
-# parallel: parallel.o input.o pthreadPool.o
-# 	$(CC) $(CFLAGS) parallel.o input.o pthreadPool.o -o parallel $(LIBS)
+parallel: parallel.o
+	$(CC) $(CFLAGS) lsh_parallel.o -o lsh_parallel $(LIBS)
 
-# parallel.o: parallel.c input.h pthreadPool.h
-# 	$(CC) $(CFLAGS) -c parallel.c
-
-# input.o: input.c input.h
-# 	$(CC) $(CFLAGS) -c input.c
-
-# pthreadPool.o: pthreadPool.c pthreadPool.h
-# 	$(CC) $(CFLAGS) -c pthreadPool.c
+parallel.o: lsh_parallel.c
+	$(CC) $(CFLAGS) -c lsh_parallel.c
 
 clean:
 	rm *.o
