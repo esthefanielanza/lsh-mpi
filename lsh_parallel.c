@@ -133,21 +133,19 @@ void hashSignature(int *hash, int *signature, int stages, int signatureSize, int
   }
 }
 
-int ** hashDataset(int nSets, int setSize, int **sets, int stages, int buckets) {
+void hashDataset(
+  int **hashes,
+  int nSets,
+  int setSize,
+  int **sets,
+  int stages,
+  int buckets,
+  int **coefs,
+  int signatureSize,
+  int partitionStart,
+  int partitionEnd
+) {
   int i;
-  int signatureSize = getSignatureSize(stages);
-
-  // printf("Signature size %d\n", signatureSize);
-
-  // Compute hash function coefficients // 
-  int **coefs = allocateMatrix(nSets, 2);
-  int **hashes = allocateMatrix(nSets, stages);
-
-  for(i = 0; i < signatureSize; i++) {
-    coefs[i][0] = (rand() % LARGE_PRIME) + 1;
-    coefs[i][1] = (rand() % LARGE_PRIME) + 1;
-  }
-
   int *set = allocateVector(setSize);
   int *signature = allocateVector(signatureSize);
 
@@ -156,7 +154,7 @@ int ** hashDataset(int nSets, int setSize, int **sets, int stages, int buckets) 
 
   // printf("\n\n=== Calculating Hash ===\n");
 
-  for(i = 0; i < nSets; i++) {
+  for(i = partitionStart; i < partitionEnd; i++) {
     convertToSet(set, sets[i], setSize);
     // printVector(setSize, set);
     calculateSignature(signature, setSize, signatureSize, set, coefs);
@@ -168,9 +166,6 @@ int ** hashDataset(int nSets, int setSize, int **sets, int stages, int buckets) 
 
   free(set);
   free(signature);
-
-  deallocateMatrix(nSets, coefs);
-  return hashes;
 }
 
 void printElementsPerBucket(int **hashes, int nSets, int stages, int buckets) {
@@ -195,47 +190,72 @@ void printElementsPerBucket(int **hashes, int nSets, int stages, int buckets) {
 
 int main () {
   // Parallel variables //
-  int nProcess, myRank;
+  int nProcess, myRank, i;
   double start, end;
 
   // Dataset params ///
   int nSets = 10;
-  int setSize = 10;
+  int setSize = 100;
   
-  // Generating dataset // 
+  // Generating dataset // x
   int **sets = allocateMatrix(nSets, setSize);
 
   generateRandomSets(nSets, setSize, sets);
 
   // printf("=== Sets ===\n");
   // printMatrix(nSets, setSize, sets);
-  
+
   // LSH Params //
   int stages = 2;
   int buckets = 4;
+  
+  // Compute hash function coefficients //
+  int signatureSize = getSignatureSize(stages);
+  // printf("Signature size %d\n", signatureSize);
+
+  int **coefs = allocateMatrix(signatureSize, 2);
+  for(i = 0; i < signatureSize; i++) {
+    coefs[i][0] = (rand() % LARGE_PRIME) + 1;
+    coefs[i][1] = (rand() % LARGE_PRIME) + 1;
+  }
+
+  int **hashes = allocateMatrix(nSets, stages);
 
   // Initialize the MPI enviroment //
   MPI_Init(NULL, NULL);
   MPI_Comm_size(MPI_COMM_WORLD, &nProcess);
   MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
 
+  // Size of each partition //
+  int partitionSize = nProcess > 0 ? ceil(nSets/nProcess) : nSets;
+
   // Getting start time //
   if(myRank == 0) {
     start = MPI_Wtime();
   }
 
+  // Spliting sets between proccess //
+  int partitionStart = myRank * partitionSize;
+  int partitionEnd = partitionStart + partitionSize;
+
+  printf("Rank[%d]: Starts on %d - Ends on %d\n", myRank, partitionStart, partitionEnd);
+
   // Generating hashes //
-  int **hashes = hashDataset(nSets, setSize, sets, stages, buckets);
+  hashDataset(hashes, nSets, setSize, sets, stages, buckets, coefs, signatureSize, partitionStart, partitionEnd);
 
   printElementsPerBucket(hashes, nSets, stages, buckets);
 
-  deallocateMatrix(nSets, hashes);
+  MPI_Barrier(MPI_COMM_WORLD);
 
   if(myRank == 0) {
     end = MPI_Wtime();
     printf("%.6lf\n", (end - start)*1000.0);
   }
 
+  MPI_Finalize();
+
+  deallocateMatrix(nSets, hashes);
+  deallocateMatrix(signatureSize, coefs);
   deallocateMatrix(nSets, sets);
 	return 0;
 }
