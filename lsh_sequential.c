@@ -12,17 +12,27 @@ long int LARGE_PRIME = 433494437;
 //TODO: Criar desalocar matrix
 int ** allocateMatrix(int nSets, int setSize) {
   int i;
-  int **mat = (int **)malloc(nSets * sizeof(int*));
+  int **mat = (int **)calloc(nSets, sizeof(int*));
 
   for(i = 0; i < nSets; i++) {
-    mat[i] = (int *)malloc(setSize * sizeof(int));
+    mat[i] = (int *)calloc(setSize, sizeof(int));
   }
 
   return mat;
 }
 
+void deallocateMatrix(int x, int **m) {
+  int i;
+
+  for(i = 0; i < x; i++) {
+    free(m[i]);
+  }
+
+  free(m);
+}
+
 int *allocateVector(int size) {
-  return (int *)malloc(size *sizeof(int));
+  return (int *)calloc(size, sizeof(int));
 }
 
 void generateRandomSets(int nSets, int setSize, int **sets) {
@@ -77,7 +87,7 @@ int * hash(int stages, int buckets, int *set, int setSize) {
 }
 
 // Compute the size of signature //
-int getSignatureSize(stages, setSize) {
+int getSignatureSize(int stages) {
   int r = (int) ceil(log(1.0 / stages) / log(THRESHOLD)) + 1;
   return r * stages;
 }
@@ -87,9 +97,8 @@ int h(int hashPosition, int setValue, int **coefs) {
   return (int)((coefs[hashPosition][0] * (long) setValue + coefs[hashPosition][1]) % LARGE_PRIME);
 }
 
-int * calculateSignature(int setSize, int signatureSize, int *set, int ** coefs) {
+void calculateSignature(int *signature, int setSize, int signatureSize, int *set, int ** coefs) {
   int i, j;
-  int *signature = allocateVector(signatureSize);
 
   for(i = 0; i < signatureSize; i++) {
     signature[i] = INT_MAX;
@@ -100,14 +109,11 @@ int * calculateSignature(int setSize, int signatureSize, int *set, int ** coefs)
       signature[j] = min(signature[j], h(j, set[i], coefs));
     }
   }
-
-  return signature;
 }
 
 // Converts to an array where we count the 1's positions //
-int * convertToSet(int *array, int length) {
+void convertToSet(int* set, int *array, int length) {
   int i, j = 0;
-  int *set = allocateVector(length);
 
   for(i = 0; i < length; i++) {
     if(array[i] == 1) {
@@ -115,32 +121,28 @@ int * convertToSet(int *array, int length) {
       j++;
     }
   }
-
-  return set;
 }
 
-int * hashSignature(int *signature, int stages, int signatureSize, int buckets) {
-  int *hash = allocateVector(stages);
-
+void hashSignature(int *hash, int *signature, int stages, int signatureSize, int buckets) {
   int rows = signatureSize / stages;
 
   for(int i = 0; i < signatureSize; i++) {
     int stage = min(i / rows, stages - 1);
     hash[stage] = (int)((hash[stage] + (long) signature[i] * LARGE_PRIME) % buckets);
   }
-
-  return hash;
 }
 
 int ** hashDataset(int nSets, int setSize, int **sets, int stages, int buckets) {
-  int i, j, k;
-  int signatureSize = getSignatureSize(stages, setSize);
+  int i;
+  int signatureSize = getSignatureSize(stages);
 
   printf("Signature size %d\n", signatureSize);
 
   // Compute hash function coefficients // 
   int **coefs = allocateMatrix(nSets, 2);
-  int **hashes = (int **)malloc(nSets * sizeof(int*));
+  int **hashes = allocateMatrix(nSets, stages);
+  int *set = allocateVector(setSize);
+  int *signature = allocateVector(signatureSize);
 
   for(i = 0; i < signatureSize; i++) {
     coefs[i][0] = (rand() % LARGE_PRIME) + 1;
@@ -151,19 +153,20 @@ int ** hashDataset(int nSets, int setSize, int **sets, int stages, int buckets) 
   printMatrix(signatureSize, 2, coefs);
 
   printf("\n\n=== Calculating Hash ===\n");
-  int **counts = allocateMatrix(stages, buckets);
 
   for(i = 0; i < nSets; i++) {
-    int *set = convertToSet(sets[i], setSize);
-    int *signature = calculateSignature(setSize, signatureSize, set, coefs);
-    hashes[i] = hashSignature(signature, stages, signatureSize, buckets);
-    // printf("Hash[%d]:", i);
+    convertToSet(set, sets[i], setSize);
     // printVector(setSize, set);
+    calculateSignature(signature, setSize, signatureSize, set, coefs);
+    hashSignature(hashes[i], signature, stages, signatureSize, buckets);
+    // printf("Hash[%d]:", i);
     // printf(" : ");
-    // printVector(signatureSize, signature);
     printVector(stages, hashes[i]);
   }
 
+  deallocateMatrix(nSets, coefs);
+  free(set);
+  free(signature);
   return hashes;
 }
 
@@ -183,6 +186,8 @@ void printElementsPerBucket(int **hashes, int nSets, int stages, int buckets) {
 
   printf("\n\n=== Buckets on each stage ===\n");
   printMatrix(stages, buckets, counts);
+
+  deallocateMatrix(stages, counts);
 }
 
 int main () {
@@ -207,5 +212,7 @@ int main () {
 
   printElementsPerBucket(hashes, nSets, stages, buckets);
 
+  deallocateMatrix(nSets, sets);
+  deallocateMatrix(nSets, hashes);
 	return 0;
 }
