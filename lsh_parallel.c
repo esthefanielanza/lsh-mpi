@@ -188,75 +188,128 @@ void printElementsPerBucket(int **hashes, int nSets, int stages, int buckets) {
   deallocateMatrix(stages, counts);
 }
 
+typedef struct initialDataType {
+  int nSets;
+  int setSize;
+  int stages;
+  int buckets;
+} initialDataType;
+
+MPI_Datatype createMpiInitialStruct() {
+  int i;
+  MPI_Datatype mpiInitialData;
+  int blockLengths[4];
+  MPI_Datatype types[4];
+  MPI_Aint offsets[4];
+
+  for(i = 0; i < 4; i++) {
+    blockLengths[i] = 1;
+    types[i] = MPI_INT;
+  }
+
+  offsets[0] = offsetof(initialDataType, nSets);
+  offsets[1] = offsetof(initialDataType, setSize);
+  offsets[2] = offsetof(initialDataType, stages);
+  offsets[3] = offsetof(initialDataType, buckets);
+
+  MPI_Type_create_struct(4, blockLengths, offsets, types, &mpiInitialData);
+  MPI_Type_commit(&mpiInitialData);
+
+  return mpiInitialData;
+}
+
+void setInitialDataOnProccess(initialDataType *initialData, double *start, MPI_Datatype mpiInitialData, int myRank, int nProcess) {
+  int i;
+
+  if(myRank == 0) {
+    // Getting start time //
+    *start = MPI_Wtime();
+
+    // LSH Params //
+    initialData->stages = 2;
+    initialData->buckets = 4;
+
+    // Dataset params ///
+    initialData->nSets = 10;
+    initialData->setSize = 100;
+    
+    for(i = 0; i < nProcess; i++) {
+      MPI_Send(initialData, 1, mpiInitialData, i, 0, MPI_COMM_WORLD);
+    }
+  } else {
+    MPI_Recv(initialData, 1, mpiInitialData, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    printf(
+      "Proccess[%d] receiving stages %d buckets %d nSets %d setSize %d\n", 
+      myRank,
+      initialData->stages,
+      initialData->buckets,
+      initialData->nSets,
+      initialData->setSize
+    );
+  }
+}
+
 //TODO: FORGOT THAT IT NEEDS TO RUN IN DIFFERENT MACHINES
 int main () {
   // Parallel variables //
-  int nProcess, myRank, i;
+  int nProcess, myRank, i, nSets, setSize, stages, buckets;
   double start, end;
 
-  // Dataset params ///
-  int nSets = 10;
-  int setSize = 100;
-  
-  // Generating dataset // x
-  int **sets = allocateMatrix(nSets, setSize);
+  // // Compute hash function coefficients //
+  // int signatureSize = getSignatureSize(stages);
 
-  generateRandomSets(nSets, setSize, sets);
+  // // Generating dataset //
+  // int **sets = allocateMatrix(nSets, setSize);
 
-  // printf("=== Sets ===\n");
-  // printMatrix(nSets, setSize, sets);
+  // generateRandomSets(nSets, setSize, sets);
 
-  // LSH Params //
-  int stages = 2;
-  int buckets = 4;
-  
-  // Compute hash function coefficients //
-  int signatureSize = getSignatureSize(stages);
-  // printf("Signature size %d\n", signatureSize);
+  // // printf("=== Sets ===\n");
+  // // printMatrix(nSets, setSize, sets);
 
-  int **coefs = allocateMatrix(signatureSize, 2);
-  for(i = 0; i < signatureSize; i++) {
-    coefs[i][0] = (rand() % LARGE_PRIME) + 1;
-    coefs[i][1] = (rand() % LARGE_PRIME) + 1;
-  }
+  // // printf("Signature size %d\n", signatureSize);
 
-  int **hashes = allocateMatrix(nSets, stages);
+  // int **coefs = allocateMatrix(signatureSize, 2);
+  // for(i = 0; i < signatureSize; i++) {
+  //   coefs[i][0] = (rand() % LARGE_PRIME) + 1;
+  //   coefs[i][1] = (rand() % LARGE_PRIME) + 1;
+  // }
+
+  // int **hashes = allocateMatrix(nSets, stages);
 
   // Initialize the MPI enviroment //
   MPI_Init(NULL, NULL);
   MPI_Comm_size(MPI_COMM_WORLD, &nProcess);
   MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
 
-  // Size of each partition //
-  int partitionSize = nProcess > 0 ? ceil(nSets/nProcess) : nSets;
+  initialDataType initialData;
+  MPI_Datatype mpiInitialData = createMpiInitialStruct();
+  setInitialDataOnProccess(&initialData, &start, mpiInitialData, myRank, nProcess);
 
-  // Getting start time //
-  if(myRank == 0) {
-    start = MPI_Wtime();
-  }
+  // // Size of each partition //
+  // int partitionSize = nProcess > 0 ? ceil(nSets/nProcess) : nSets;
 
-  // Spliting sets between proccess //
-  int partitionStart = myRank * partitionSize;
-  int partitionEnd = partitionStart + partitionSize;
+  // // Spliting sets between proccess //
+  // int partitionStart = myRank * partitionSize;
+  // int partitionEnd = partitionStart + partitionSize;
 
-  printf("Rank[%d]: Starts on %d - Ends on %d\n", myRank, partitionStart, partitionEnd);
+  // printf("Rank[%d]: Starts on %d - Ends on %d\n", myRank, partitionStart, partitionEnd);
 
-  // Generating hashes //
-  hashDataset(hashes, nSets, setSize, sets, stages, buckets, coefs, signatureSize, partitionStart, partitionEnd);
+  // // Generating hashes //
+  // hashDataset(hashes, nSets, setSize, sets, stages, buckets, coefs, signatureSize, partitionStart, partitionEnd);
 
-  printElementsPerBucket(hashes, nSets, stages, buckets);
+  // printElementsPerBucket(hashes, nSets, stages, buckets);
 
-  MPI_Barrier(MPI_COMM_WORLD);
+  // MPI_Barrier(MPI_COMM_WORLD);
 
-  if(myRank == 0) {
-    end = MPI_Wtime();
-    printf("%.6lf\n", (end - start)*1000.0);
-  }
+  // if(myRank == 0) {
+  //   end = MPI_Wtime();
+  //   printf("%.6lf\n", (end - start)*1000.0);
+  // }
 
   MPI_Finalize();
 
-  deallocateMatrix(nSets, hashes);
-  deallocateMatrix(signatureSize, coefs);
-  deallocateMatrix(nSets, sets);
+  // deallocateMatrix(nSets, hashes);
+  // deallocateMatrix(signatureSize, coefs);
+  // deallocateMatrix(nSets, sets);
 	return 0;
 }
