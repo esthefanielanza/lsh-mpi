@@ -188,6 +188,7 @@ void printElementsPerBucket(int **hashes, int nSets, int stages, int buckets) {
   deallocateMatrix(stages, counts);
 }
 
+//TODO: FORGOT THAT IT NEEDS TO RUN IN DIFFERENT MACHINES
 int main () {
   // Parallel variables //
   int nProcess, myRank, i;
