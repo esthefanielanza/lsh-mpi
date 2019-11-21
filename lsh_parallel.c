@@ -36,16 +36,14 @@ int *allocateVector(int size) {
   return (int *)calloc(size, sizeof(int));
 }
 
-void generateRandomSets(int nSets, int setSize, int **sets) {
+void generateRandomSets(int nSets, int setSize, int *sets) {
   srand(time(NULL));
 
-  int i, j;
+  int i;
 
-  for(i = 0; i < nSets; i++) {
-    for(j = 0; j < setSize; j++) {
-      double sortedNumber = (double)rand() / (double)RAND_MAX;
-      sets[i][j] = sortedNumber > RANDOM_ACCURACY;
-    }
+  for(i = 0; i < nSets * setSize; i++) {
+    double sortedNumber = (double)rand() / (double)RAND_MAX;
+    sets[i] = sortedNumber > RANDOM_ACCURACY;
   }
 }
 
@@ -113,15 +111,24 @@ void calculateSignature(int *signature, int setSize, int signatureSize, int *set
 }
 
 // Converts to an array where we count the 1's positions //
-void convertToSet(int* set, int *array, int length) {
+void convertToSet(int* set, int *array, int start, int length) {
   int i, j = 0;
 
-  for(i = 0; i < length; i++) {
+  for(i = start; i < start + length; i++) {
+    // printf("%d ", array[i]);
     if(array[i] == 1) {
-      set[j] = i;
+      set[j] = i - start;
       j++;
     }
   }
+
+  // Cleaning array
+  while(j < length) {
+    set[j] = 0;
+    j++;
+  }
+
+  // printf(" = ");
 }
 
 void hashSignature(int *hash, int *signature, int stages, int signatureSize, int buckets) {
@@ -134,13 +141,13 @@ void hashSignature(int *hash, int *signature, int stages, int signatureSize, int
 }
 
 void hashDataset(
-  int **hashes,
+  int *hashes,
   int nSets,
   int setSize,
-  int **sets,
+  int *sets,
   int stages,
   int buckets,
-  int **coefs,
+  int *coefs,
   int signatureSize,
   int partitionStart,
   int partitionEnd
@@ -155,10 +162,10 @@ void hashDataset(
   // printf("\n\n=== Calculating Hash ===\n");
 
   for(i = partitionStart; i < partitionEnd; i++) {
-    convertToSet(set, sets[i], setSize);
-    // printVector(setSize, set);
-    calculateSignature(signature, setSize, signatureSize, set, coefs);
-    hashSignature(hashes[i], signature, stages, signatureSize, buckets);
+    convertToSet(set, sets, i * setSize, setSize);
+    // calculateSignature(signature, setSize, signatureSize, set, coefs);
+    // printVector(signatureSize, signature);
+    // hashSignature(hashes[i], signature, stages, signatureSize, buckets);
     // printf("Hash[%d]:", i);
     // printf(" : ");
     // printVector(stages, hashes[i]);
@@ -231,50 +238,40 @@ void setInitialDataOnProccess(initialDataType *initialData, double *start, MPI_D
 
     // Dataset params ///
     initialData->nSets = 10;
-    initialData->setSize = 100;
+    initialData->setSize = 4;
     
     for(i = 0; i < nProcess; i++) {
       MPI_Send(initialData, 1, mpiInitialData, i, 0, MPI_COMM_WORLD);
     }
   } else {
     MPI_Recv(initialData, 1, mpiInitialData, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    printf(
-      "Proccess[%d] receiving stages %d buckets %d nSets %d setSize %d\n", 
-      myRank,
-      initialData->stages,
-      initialData->buckets,
-      initialData->nSets,
-      initialData->setSize
-    );
+    // printf(
+    //   "Proccess[%d] receiving stages %d buckets %d nSets %d setSize %d\n", 
+    //   myRank,
+    //   initialData->stages,
+    //   initialData->buckets,
+    //   initialData->nSets,
+    //   initialData->setSize
+    // );
+  }
+}
+
+void printVectorAsMatrix(int m, int n, int *vector) {
+  int i;
+
+  for(i = 0; i < m * n; i++) {
+    printf("%d ", vector[i]);
+    if(i != 0 && (i + 1) % n == 0) {
+      printf("\n");
+    }
   }
 }
 
 //TODO: FORGOT THAT IT NEEDS TO RUN IN DIFFERENT MACHINES
 int main () {
   // Parallel variables //
-  int nProcess, myRank, i, nSets, setSize, stages, buckets;
+  int nProcess, myRank, i, stages, buckets;
   double start, end;
-
-  // // Compute hash function coefficients //
-  // int signatureSize = getSignatureSize(stages);
-
-  // // Generating dataset //
-  // int **sets = allocateMatrix(nSets, setSize);
-
-  // generateRandomSets(nSets, setSize, sets);
-
-  // // printf("=== Sets ===\n");
-  // // printMatrix(nSets, setSize, sets);
-
-  // // printf("Signature size %d\n", signatureSize);
-
-  // int **coefs = allocateMatrix(signatureSize, 2);
-  // for(i = 0; i < signatureSize; i++) {
-  //   coefs[i][0] = (rand() % LARGE_PRIME) + 1;
-  //   coefs[i][1] = (rand() % LARGE_PRIME) + 1;
-  // }
-
-  // int **hashes = allocateMatrix(nSets, stages);
 
   // Initialize the MPI enviroment //
   MPI_Init(NULL, NULL);
@@ -285,16 +282,67 @@ int main () {
   MPI_Datatype mpiInitialData = createMpiInitialStruct();
   setInitialDataOnProccess(&initialData, &start, mpiInitialData, myRank, nProcess);
 
-  // // Size of each partition //
-  // int partitionSize = nProcess > 0 ? ceil(nSets/nProcess) : nSets;
+  // Generating dataset //
+  int *sets = allocateVector(initialData.nSets * initialData.setSize);
+  if(myRank == 0) {
+    generateRandomSets(initialData.nSets, initialData.setSize, sets);
 
-  // // Spliting sets between proccess //
-  // int partitionStart = myRank * partitionSize;
-  // int partitionEnd = partitionStart + partitionSize;
+    for(i = 0; i < nProcess; i++) {
+      MPI_Send(sets, initialData.nSets * initialData.setSize, MPI_INT, i, 0, MPI_COMM_WORLD);
+    }
+  } else {
+    MPI_Recv(sets, initialData.nSets*initialData.setSize, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    // printVectorAsMatrix(initialData.nSets, initialData.setSize, sets);
+  }
 
+  // Compute hash function coefficients //
+  int signatureSize = getSignatureSize(initialData.stages);
+
+  // Size of each partition //
+  int partitionSize = nProcess > 0 ? ceil(initialData.nSets/nProcess) : initialData.nSets;
+  
+  // Generating hash coefs //
+  int *coefs = allocateVector(signatureSize*2);
+  if(myRank == 0) {
+    for(i = 0; i < signatureSize * 2; i++) {
+      coefs[i] = (rand() % LARGE_PRIME) + 1;
+    }
+
+    // printf("==== Coefs ====\n");
+    // printVectorAsMatrix(signatureSize, 2, coefs);
+    for(i = 0; i < nProcess; i++) {
+      MPI_Send(coefs, signatureSize*2, MPI_INT, i, 0, MPI_COMM_WORLD);
+    }
+  } else {
+    MPI_Recv(coefs, signatureSize*2, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  }
+  
   // printf("Rank[%d]: Starts on %d - Ends on %d\n", myRank, partitionStart, partitionEnd);
 
-  // // Generating hashes //
+  // Generating hashes //
+  if(myRank == 0) {
+    // Spliting sets between proccess //
+    int partitionStart = myRank * partitionSize;
+    int partitionEnd = partitionStart + partitionSize;
+    int *hashes = allocateVector(initialData.nSets*initialData.stages);
+    
+    hashDataset(
+      hashes,
+      initialData.nSets,
+      initialData.setSize,
+      sets,
+      initialData.stages,
+      initialData.buckets,
+      coefs,
+      signatureSize,
+      partitionStart,
+      partitionEnd
+    );
+
+    // printVectorAsMatrix(initialData.nSets, initialData.stages, hashes);
+  } else {
+    // int hashesPartition = allocateMatrix(partitionSize, initialData.stages);
+  }
   // hashDataset(hashes, nSets, setSize, sets, stages, buckets, coefs, signatureSize, partitionStart, partitionEnd);
 
   // printElementsPerBucket(hashes, nSets, stages, buckets);
