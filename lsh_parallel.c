@@ -179,16 +179,11 @@ void hashDataset(
     convertToSet(set, sets, i * setSize, setSize);
     // printVector(setSize, set);
     calculateSignature(signature, setSize, signatureSize, set, coefs);
-    printVector(signatureSize, signature);
-    // hashSignature(hashes, i, signature, stages, signatureSize, buckets);
-    // printf("Hash[%d]:", i);
-    // printf(" : ");
-    // for(j = i + (stages * i); j < i + ((i + 1) * stages); j++) {
-    //   printf("%d ", hashes[j]);
-    // }
-    // printf("\n");
+    // printVector(signatureSize, signature);
+    hashSignature(hashes, i, signature, stages, signatureSize, buckets);
   }
 
+  printVectorAsMatrix(partitionEnd - partitionStart, stages, hashes);
   free(set);
   free(signature);
 }

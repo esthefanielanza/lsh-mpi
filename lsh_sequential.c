@@ -166,12 +166,12 @@ int ** hashDataset(int nSets, int setSize, int **sets, int stages, int buckets) 
     // printVector(setSize, set);
 
     calculateSignature(signature, setSize, signatureSize, set, coefs);
-    printVector(signatureSize, signature);
+    // printVector(signatureSize, signature);
 
     hashSignature(hashes[i], signature, stages, signatureSize, buckets);
-    // printf("Hash[%d]:", i);
-    // printf(" : ");
-    // printVector(stages, hashes[i]);
+    printf("Hash[%d]:", i);
+    printf(" : ");
+    printVector(stages, hashes[i]);
   }
 
   free(set);
