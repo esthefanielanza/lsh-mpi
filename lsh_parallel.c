@@ -183,27 +183,27 @@ void hashDataset(
     hashSignature(hashes, i, signature, stages, signatureSize, buckets);
   }
 
-  printVectorAsMatrix(partitionEnd - partitionStart, stages, hashes);
+  // printVectorAsMatrix(partitionEnd - partitionStart, stages, hashes);
   free(set);
   free(signature);
 }
 
-void printElementsPerBucket(int **hashes, int nSets, int stages, int buckets) {
+void printElementsPerBucket(int *hashes, int nSets, int stages, int buckets) {
   int i, j;
   int **counts = allocateMatrix(stages, buckets);
 
   // printf("\n\n=== Last stage position ===\n");
   for(i = 0; i < nSets; i++) {
     for(j = 0; j < stages; j++) {
-      counts[j][hashes[i][j]]++;
+      counts[j][hashes[i*stages + j]]++;
       // if(j == stages - 1) {
       //   printf("Set %d is on %d bucket\n", i, hashes[i][j]);
       // }
     }
   }
 
-  // printf("\n\n=== Buckets on each stage ===\n");
-  // printMatrix(stages, buckets, counts);
+  printf("\n\n=== Buckets on each stage ===\n");
+  printMatrix(stages, buckets, counts);
 
   deallocateMatrix(stages, counts);
 }
@@ -285,23 +285,34 @@ int main () {
   setInitialDataOnProccess(&initialData, &start, mpiInitialData, myRank, nProcess);
 
   // Generating dataset //
-  int *sets = allocateVector(initialData.nSets * initialData.setSize);
-  if(myRank == 0) {
-    generateRandomSets(initialData.nSets, initialData.setSize, sets);
+  
+  // Size of each partition //
+  int partitionSize = nProcess > 0 ? ceil(initialData.nSets/nProcess) : initialData.nSets;
 
-    for(i = 0; i < nProcess; i++) {
-      MPI_Send(sets, initialData.nSets * initialData.setSize, MPI_INT, i, 0, MPI_COMM_WORLD);
+  int *sets = allocateVector(partitionSize * initialData.setSize);
+  if(myRank == 0) {
+    int *allSets = allocateVector(initialData.nSets * initialData.setSize);
+    generateRandomSets(initialData.nSets, initialData.setSize, allSets);
+
+    memcpy(sets, allSets, partitionSize * initialData.setSize * sizeof(int));
+
+    // printf("ALL SETS\n");
+    // printVectorAsMatrix(initialData.nSets, initialData.setSize, allSets);
+
+    for(i = 1; i < nProcess; i++) { 
+      MPI_Send(&allSets[i * partitionSize * initialData.setSize], partitionSize * initialData.setSize, MPI_INT, i, 0, MPI_COMM_WORLD);
     }
+
+    free(allSets);
   } else {
-    MPI_Recv(sets, initialData.nSets*initialData.setSize, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    // printVectorAsMatrix(initialData.nSets, initialData.setSize, sets);
+    MPI_Recv(sets, partitionSize * initialData.setSize, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    // printf("SET PROCCESS\n");
+    // printVectorAsMatrix(partitionSize, initialData.setSize, sets);
+    // printf("\n");
   }
 
   // Compute hash function coefficients //
   int signatureSize = getSignatureSize(initialData.stages);
-
-  // Size of each partition //
-  int partitionSize = nProcess > 0 ? ceil(initialData.nSets/nProcess) : initialData.nSets;
   
   // Generating hash coefs //
   int *coefs = allocateVector(signatureSize*2);
@@ -322,6 +333,7 @@ int main () {
   // printf("Rank[%d]: Starts on %d - Ends on %d\n", myRank, partitionStart, partitionEnd);
 
   // Generating hashes //
+  int hashesSize = partitionSize * initialData.stages;
   if(myRank == 0) {
     // Spliting sets between proccess //
     int partitionStart = myRank * partitionSize;
@@ -330,7 +342,7 @@ int main () {
     
     hashDataset(
       hashes,
-      initialData.nSets,
+      partitionSize,
       initialData.setSize,
       sets,
       initialData.stages,
@@ -341,13 +353,38 @@ int main () {
       partitionEnd
     );
 
-    // printVectorAsMatrix(initialData.nSets, initialData.stages, hashes);
-  } else {
-    // int hashesPartition = allocateMatrix(partitionSize, initialData.stages);
-  }
-  // hashDataset(hashes, nSets, setSize, sets, stages, buckets, coefs, signatureSize, partitionStart, partitionEnd);
+    for(i = 1; i < nProcess; i++) {
+      printf("Putting on position %d\n", i * partitionSize);
+      int *partitionHashes = allocateVector(hashesSize);
+      MPI_Recv(partitionHashes, hashesSize, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      printVectorAsMatrix(partitionSize, initialData.stages, partitionHashes);
+      memcpy(&hashes[hashesSize * i], partitionHashes, hashesSize * sizeof(int));
+      // printVectorAsMatrix(initialData.nSets, initialData.stages, hashes);
+    }
 
-  // printElementsPerBucket(hashes, nSets, stages, buckets);
+    printf("\n=====HASHES=====\n");
+    printVectorAsMatrix(initialData.nSets, initialData.stages, hashes);
+
+    printElementsPerBucket(hashes, initialData.nSets, initialData.stages, initialData.buckets);
+  } else {
+    int *hashes = allocateVector(hashesSize);
+    // printVectorAsMatrix(partitionSize, initialData.setSize, sets);
+    hashDataset(
+      hashes,
+      partitionSize,
+      initialData.setSize,
+      sets,
+      initialData.stages,
+      initialData.buckets,
+      coefs,
+      signatureSize,
+      0,
+      partitionSize
+    );
+    
+    // printVectorAsMatrix(partitionSize, initialData.stages, hashes);
+    MPI_Send(hashes, hashesSize, MPI_INT, 0, 0, MPI_COMM_WORLD);
+  }
 
   // MPI_Barrier(MPI_COMM_WORLD);
 
