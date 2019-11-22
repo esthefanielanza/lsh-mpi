@@ -10,7 +10,6 @@ double RANDOM_ACCURACY = 0.7;
 double THRESHOLD = 0.5;
 long int LARGE_PRIME = 433494437;
 
-//TODO: Criar desalocar matrix
 int ** allocateMatrix(int nSets, int setSize) {
   int i;
   int **mat = (int **)calloc(nSets, sizeof(int*));
@@ -269,10 +268,9 @@ void setInitialDataOnProccess(initialDataType *initialData, double *start, MPI_D
   }
 }
 
-//TODO: FORGOT THAT IT NEEDS TO RUN IN DIFFERENT MACHINES
 int main () {
   // Parallel variables //
-  int nProcess, myRank, i, stages, buckets;
+  int nProcess, myRank, i;
   double start, end;
 
   // Initialize the MPI enviroment //
@@ -283,29 +281,28 @@ int main () {
   initialDataType initialData;
   MPI_Datatype mpiInitialData = createMpiInitialStruct();
   setInitialDataOnProccess(&initialData, &start, mpiInitialData, myRank, nProcess);
-
-  // Generating dataset //
   
   // Size of each partition //
   int partitionSize = nProcess > 0 ? ceil(initialData.nSets/nProcess) : initialData.nSets;
 
-  int *sets = allocateVector(partitionSize * initialData.setSize);
+  int partitionSetSize = partitionSize * initialData.setSize;
+  int *sets = allocateVector(partitionSetSize);
   if(myRank == 0) {
     int *allSets = allocateVector(initialData.nSets * initialData.setSize);
     generateRandomSets(initialData.nSets, initialData.setSize, allSets);
 
-    memcpy(sets, allSets, partitionSize * initialData.setSize * sizeof(int));
+    memcpy(sets, allSets, partitionSetSize * sizeof(int));
 
     // printf("ALL SETS\n");
     // printVectorAsMatrix(initialData.nSets, initialData.setSize, allSets);
 
     for(i = 1; i < nProcess; i++) { 
-      MPI_Send(&allSets[i * partitionSize * initialData.setSize], partitionSize * initialData.setSize, MPI_INT, i, 0, MPI_COMM_WORLD);
+      MPI_Send(&allSets[i * partitionSetSize], partitionSetSize, MPI_INT, i, 0, MPI_COMM_WORLD);
     }
 
     free(allSets);
   } else {
-    MPI_Recv(sets, partitionSize * initialData.setSize, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Recv(sets, partitionSetSize, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     // printf("SET PROCCESS\n");
     // printVectorAsMatrix(partitionSize, initialData.setSize, sets);
     // printf("\n");
@@ -354,12 +351,7 @@ int main () {
     );
 
     for(i = 1; i < nProcess; i++) {
-      printf("Putting on position %d\n", i * partitionSize);
-      int *partitionHashes = allocateVector(hashesSize);
-      MPI_Recv(partitionHashes, hashesSize, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-      printVectorAsMatrix(partitionSize, initialData.stages, partitionHashes);
-      memcpy(&hashes[hashesSize * i], partitionHashes, hashesSize * sizeof(int));
-      // printVectorAsMatrix(initialData.nSets, initialData.stages, hashes);
+      MPI_Recv(&hashes[hashesSize * i], hashesSize, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
 
     printf("\n=====HASHES=====\n");
@@ -384,19 +376,18 @@ int main () {
     
     // printVectorAsMatrix(partitionSize, initialData.stages, hashes);
     MPI_Send(hashes, hashesSize, MPI_INT, 0, 0, MPI_COMM_WORLD);
+
+    free(hashes);
   }
 
-  // MPI_Barrier(MPI_COMM_WORLD);
-
-  // if(myRank == 0) {
-  //   end = MPI_Wtime();
-  //   printf("%.6lf\n", (end - start)*1000.0);
-  // }
+  if(myRank == 0) {
+    end = MPI_Wtime();
+    printf("%.6lf\n", (end - start)*1000.0);
+  }
 
   MPI_Finalize();
 
-  // deallocateMatrix(nSets, hashes);
-  // deallocateMatrix(signatureSize, coefs);
-  // deallocateMatrix(nSets, sets);
+  free(coefs);
+  free(sets);
 	return 0;
 }
