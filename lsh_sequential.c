@@ -36,7 +36,7 @@ int *allocateVector(int size) {
 }
 
 void generateRandomSets(int nSets, int setSize, int **sets) {
-  srand(time(NULL));
+  srand(0);
 
   int i, j;
 
@@ -121,6 +121,12 @@ void convertToSet(int* set, int *array, int length) {
       j++;
     }
   }
+
+  // Cleaning array
+  while(j < length) {
+    set[j] = 0;
+    j++;
+  }
 }
 
 void hashSignature(int *hash, int *signature, int stages, int signatureSize, int buckets) {
@@ -158,11 +164,14 @@ int ** hashDataset(int nSets, int setSize, int **sets, int stages, int buckets) 
   for(i = 0; i < nSets; i++) {
     convertToSet(set, sets[i], setSize);
     // printVector(setSize, set);
+
     calculateSignature(signature, setSize, signatureSize, set, coefs);
+    printVector(signatureSize, signature);
+
     hashSignature(hashes[i], signature, stages, signatureSize, buckets);
     // printf("Hash[%d]:", i);
     // printf(" : ");
-    printVector(stages, hashes[i]);
+    // printVector(stages, hashes[i]);
   }
 
   free(set);
@@ -195,7 +204,7 @@ void printElementsPerBucket(int **hashes, int nSets, int stages, int buckets) {
 int main () {
   // Dataset params ///
   int nSets = 10;
-  int setSize = 10;
+  int setSize = 4;
   
   // Generating dataset // 
   int **sets = allocateMatrix(nSets, setSize);

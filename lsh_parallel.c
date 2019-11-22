@@ -37,7 +37,7 @@ int *allocateVector(int size) {
 }
 
 void generateRandomSets(int nSets, int setSize, int *sets) {
-  srand(time(NULL));
+  srand(0);
 
   int i;
 
@@ -72,6 +72,18 @@ int min(int x, int y) {
   return (x < y) ? x : y;
 }
 
+
+void printVectorAsMatrix(int m, int n, int *vector) {
+  int i;
+
+  for(i = 0; i < m * n; i++) {
+    printf("%d ", vector[i]);
+    if(i != 0 && (i + 1) % n == 0) {
+      printf("\n");
+    }
+  }
+}
+
 int * hash(int stages, int buckets, int *set, int setSize) {
   int i;
   int *hash = allocateVector(stages);
@@ -92,11 +104,12 @@ int getSignatureSize(int stages) {
 }
 
 
-int h(int hashPosition, int setValue, int **coefs) {
-  return (int)((coefs[hashPosition][0] * (long) setValue + coefs[hashPosition][1]) % LARGE_PRIME);
+int h(int hashPosition, int setValue, int *coefs, int signatureSize) {
+  int start = 2 * hashPosition;
+  return (int)((coefs[start] * (long) setValue + coefs[start + 1]) % LARGE_PRIME);
 }
 
-void calculateSignature(int *signature, int setSize, int signatureSize, int *set, int ** coefs) {
+void calculateSignature(int *signature, int setSize, int signatureSize, int *set, int *coefs) {
   int i, j;
 
   for(i = 0; i < signatureSize; i++) {
@@ -105,7 +118,7 @@ void calculateSignature(int *signature, int setSize, int signatureSize, int *set
 
   for(i = 0; i < setSize; i++) {
     for(j = 0; j < signatureSize; j++) {
-      signature[j] = min(signature[j], h(j, set[i], coefs));
+      signature[j] = min(signature[j], h(j, set[i], coefs, signatureSize));
     }
   }
 }
@@ -131,12 +144,13 @@ void convertToSet(int* set, int *array, int start, int length) {
   // printf(" = ");
 }
 
-void hashSignature(int *hash, int *signature, int stages, int signatureSize, int buckets) {
+void hashSignature(int *hashes, int currentHash, int *signature, int stages, int signatureSize, int buckets) {
   int rows = signatureSize / stages;
 
   for(int i = 0; i < signatureSize; i++) {
     int stage = min(i / rows, stages - 1);
-    hash[stage] = (int)((hash[stage] + (long) signature[i] * LARGE_PRIME) % buckets);
+    int start = stage + (currentHash * stages);
+    hashes[start] = (int)((hashes[start] + (long) signature[i] * LARGE_PRIME) % buckets);
   }
 }
 
@@ -152,7 +166,7 @@ void hashDataset(
   int partitionStart,
   int partitionEnd
 ) {
-  int i;
+  int i, j;
   int *set = allocateVector(setSize);
   int *signature = allocateVector(signatureSize);
 
@@ -163,12 +177,16 @@ void hashDataset(
 
   for(i = partitionStart; i < partitionEnd; i++) {
     convertToSet(set, sets, i * setSize, setSize);
-    // calculateSignature(signature, setSize, signatureSize, set, coefs);
-    // printVector(signatureSize, signature);
-    // hashSignature(hashes[i], signature, stages, signatureSize, buckets);
+    // printVector(setSize, set);
+    calculateSignature(signature, setSize, signatureSize, set, coefs);
+    printVector(signatureSize, signature);
+    // hashSignature(hashes, i, signature, stages, signatureSize, buckets);
     // printf("Hash[%d]:", i);
     // printf(" : ");
-    // printVector(stages, hashes[i]);
+    // for(j = i + (stages * i); j < i + ((i + 1) * stages); j++) {
+    //   printf("%d ", hashes[j]);
+    // }
+    // printf("\n");
   }
 
   free(set);
@@ -256,17 +274,6 @@ void setInitialDataOnProccess(initialDataType *initialData, double *start, MPI_D
   }
 }
 
-void printVectorAsMatrix(int m, int n, int *vector) {
-  int i;
-
-  for(i = 0; i < m * n; i++) {
-    printf("%d ", vector[i]);
-    if(i != 0 && (i + 1) % n == 0) {
-      printf("\n");
-    }
-  }
-}
-
 //TODO: FORGOT THAT IT NEEDS TO RUN IN DIFFERENT MACHINES
 int main () {
   // Parallel variables //
@@ -324,7 +331,7 @@ int main () {
     // Spliting sets between proccess //
     int partitionStart = myRank * partitionSize;
     int partitionEnd = partitionStart + partitionSize;
-    int *hashes = allocateVector(initialData.nSets*initialData.stages);
+    int *hashes = allocateVector(initialData.nSets * initialData.stages);
     
     hashDataset(
       hashes,
