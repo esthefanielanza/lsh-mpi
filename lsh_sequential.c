@@ -203,8 +203,8 @@ void printElementsPerBucket(int **hashes, int nSets, int stages, int buckets) {
 
 int main () {
   // Dataset params ///
-  int nSets = 10;
-  int setSize = 4;
+  int nSets = 1000;
+  int setSize = 10;
   
   // Generating dataset // 
   int **sets = allocateMatrix(nSets, setSize);
