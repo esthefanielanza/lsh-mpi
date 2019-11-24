@@ -230,12 +230,12 @@ void setInitialDataOnProccess(initialDataType *initialData, double *start, MPI_D
     *start = MPI_Wtime();
 
     // LSH Params //
-    initialData->stages = 2;
-    initialData->buckets = 4;
+    initialData->stages = 10;
+    initialData->buckets = 10;
 
     // Dataset params ///
     initialData->nSets = 1000;
-    initialData->setSize = 10;
+    initialData->setSize = 100;
     
     for(i = 0; i < nProcess; i++) {
       MPI_Send(initialData, 1, mpiInitialData, i, 0, MPI_COMM_WORLD);
