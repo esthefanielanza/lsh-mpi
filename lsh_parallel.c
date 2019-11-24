@@ -237,7 +237,7 @@ void setInitialDataOnProccess(initialDataType *initialData, double *start, MPI_D
     initialData->nSets = 1000;
     initialData->setSize = 100;
     
-    for(i = 0; i < nProcess; i++) {
+    for(i = 1; i < nProcess; i++) {
       MPI_Send(initialData, 1, mpiInitialData, i, 0, MPI_COMM_WORLD);
     }
   } else {
@@ -295,7 +295,7 @@ int main () {
     }
     
     // After generating coefs master node send all of them to the slaves //
-    for(i = 0; i < nProcess; i++) {
+    for(i = 1; i < nProcess; i++) {
       MPI_Send(coefs, signatureSize*2, MPI_INT, i, 0, MPI_COMM_WORLD);
     }
   } else {
