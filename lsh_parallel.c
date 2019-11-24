@@ -5,10 +5,18 @@
 #include <math.h>
 #include <limits.h>
 #include <mpi.h>
+#include <stddef.h>
 
 double RANDOM_ACCURACY = 0.7;
 double THRESHOLD = 0.5;
 long int LARGE_PRIME = 433494437;
+
+typedef struct initialDataType {
+  int nSets;
+  int setSize;
+  int stages;
+  int buckets;
+} initialDataType;
 
 int ** allocateMatrix(int nSets, int setSize) {
   int i;
@@ -190,13 +198,6 @@ void printElementsPerBucket(int *hashes, int nSets, int stages, int buckets) {
 
   deallocateMatrix(stages, counts);
 }
-
-typedef struct initialDataType {
-  int nSets;
-  int setSize;
-  int stages;
-  int buckets;
-} initialDataType;
 
 MPI_Datatype createMpiInitialStruct() {
   int i;
