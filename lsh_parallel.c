@@ -103,7 +103,7 @@ int getSignatureSize(int stages) {
 }
 
 
-int h(int hashPosition, int setValue, int *coefs, int signatureSize) {
+int h(int hashPosition, int setValue, int *coefs) {
   int start = 2 * hashPosition;
   return (int)((coefs[start] * (long) setValue + coefs[start + 1]) % LARGE_PRIME);
 }
@@ -117,7 +117,7 @@ void calculateSignature(int *signature, int setSize, int signatureSize, int *set
 
   for(i = 0; i < setSize; i++) {
     for(j = 0; j < signatureSize; j++) {
-      signature[j] = min(signature[j], h(j, set[i], coefs, signatureSize));
+      signature[j] = min(signature[j], h(j, set[i], coefs));
     }
   }
 }
@@ -152,7 +152,6 @@ void hashSignature(int *hashes, int currentHash, int *signature, int stages, int
 
 void hashDataset(
   int *hashes,
-  int nSets,
   int setSize,
   int *sets,
   int stages,
@@ -162,7 +161,7 @@ void hashDataset(
   int partitionStart,
   int partitionEnd
 ) {
-  int i, j;
+  int i;
   int *set = allocateVector(setSize);
   int *signature = allocateVector(signatureSize);
 
@@ -318,7 +317,6 @@ int main () {
     // Master calculate the hashes of their first N sets //
     hashDataset(
       hashes,
-      partitionSize,
       initialData.setSize,
       sets,
       initialData.stages,
@@ -343,7 +341,6 @@ int main () {
     // Slaves calculate the hashes of their sets //
     hashDataset(
       hashes,
-      partitionSize,
       initialData.setSize,
       sets,
       initialData.stages,

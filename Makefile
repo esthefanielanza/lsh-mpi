@@ -1,6 +1,5 @@
 CC = mpicc
-# CFLAGS = -g -O0 -Wall -Wextra -Werror -std=c99 -fopenmp
-CCFLAGS = -g
+CFLAGS = -g -O0 -Wall -Wextra -Werror -std=c99 -fopenmp
 LIBS = -lm
 
 all: sequential parallel clean
