@@ -193,7 +193,7 @@ void printElementsPerBucket(int *hashes, int nSets, int stages, int buckets) {
     }
   }
 
-  printf("\n\n=== Buckets on each stage ===\n");
+  printf("=== Buckets on each stage ===\n");
   printMatrix(stages, buckets, counts);
 
   deallocateMatrix(stages, counts);
@@ -360,7 +360,7 @@ int main () {
 
   if(myRank == 0) {
     end = MPI_Wtime();
-    printf("%.6lf\n", (end - start)*1000.0);
+    printf("\n%.6lf\n", (end - start)*1000.0);
   }
 
   MPI_Finalize();
